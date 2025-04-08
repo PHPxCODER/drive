@@ -12,6 +12,15 @@ import { getServerSession } from 'next-auth/next'
 import React from 'react'
 import { authOptions } from '@/auth.config'
 import { prisma } from '@/lib/prisma'
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: 'Trash | RDP Cloud',
+  description: 'Your personal cloud storage and file management system',
+  icons: {
+    icon: '/drive.svg',
+  },
+}
 
 const TrashPage = async () => {
 	const session = await getServerSession(authOptions)

@@ -10,6 +10,14 @@ import { UploadProvider } from "@/components/UploadProgress";
 
 const inter = Inter({ subsets: ["latin"] });
 
+export const metadata: Metadata = {
+  title: "RDP Cloud",
+  description: "Google Drive clone built with Next.js, Prisma, and AWS S3",
+  icons: {
+    icon: "/drive.svg",
+  },
+};
+
 export default function RootLayout({
   children,
 }: {
