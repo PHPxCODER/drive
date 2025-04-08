@@ -111,7 +111,7 @@ export default function SignInPage() {
               <path d="M12 6c-3.3 0-6 2.7-6 6s2.7 6 6 6 6-2.7 6-6-2.7-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" />
               <circle cx="12" cy="12" r="2" />
             </svg>
-            <span>Continue with Cognito</span>
+            <span>Continue with RDP SSO</span>
           </Button>
         </div>
 

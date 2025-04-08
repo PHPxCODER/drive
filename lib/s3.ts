@@ -10,13 +10,14 @@ const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklm
 
 // Create an S3 client
 const s3Client = new S3Client({
-  region: process.env.MINIO_REGION || 'us-east-1', // Doesn't matter for MinIO
+  region: process.env.MINIO_REGION || 'ap-southeast-1', // Doesn't matter for MinIO
   endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
   credentials: {
     accessKeyId: process.env.MINIO_ACCESS_KEY || 'minioadmin',
     secretAccessKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
   },
   forcePathStyle: true, // Required for MinIO
+  // tls: process.env.MINIO_USE_SSL === 'true',
 });
 
 // Bucket name
