@@ -10,7 +10,7 @@ const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklm
 
 // Create an S3 client
 const s3Client = new S3Client({
-  region: 'us-east-1', // Doesn't matter for MinIO
+  region: process.env.MINIO_REGION || 'us-east-1', // Doesn't matter for MinIO
   endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
   credentials: {
     accessKeyId: process.env.MINIO_ACCESS_KEY || 'minioadmin',
@@ -23,9 +23,14 @@ const s3Client = new S3Client({
 const BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'user-files';
 
 // Generate an upload URL for a new file
-export async function generateUploadUrl(contentType: string): Promise<{ url: string; key: string; slug: string }> {
-  const slug = nanoid();
-  const key = `uploads/${slug}`;
+export async function generateUploadUrl(
+  contentType: string, 
+  userId: string, 
+  folderId?: string
+): Promise<{ url: string; key: string; }> {
+  const id = nanoid();
+  const folderPath = folderId ? `users/${userId}/folders/${folderId}` : `users/${userId}`;
+  const key = `${folderPath}/${id}`;
   
   // Creating presigned URL for PUT
   const command = new PutObjectCommand({
@@ -39,12 +44,11 @@ export async function generateUploadUrl(contentType: string): Promise<{ url: str
   return {
     url,
     key,
-    slug,
   };
 }
 
 // Generate a download URL for an existing file
-export async function generateDownloadUrl(key: string): Promise<string> {
+export async function getFileUrl(key: string): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
@@ -63,4 +67,44 @@ export async function deleteFile(key: string): Promise<void> {
   });
   
   await s3Client.send(command);
+}
+
+// Calculate the file size in bytes from a base64 string
+export function calculateFileSize(base64String: string): number {
+  // Remove the data URL prefix (if present)
+  const base64Data = base64String.split(',')[1] || base64String;
+  // Calculate size: Base64 encodes 3 bytes into 4 characters
+  return Math.ceil((base64Data.length * 3) / 4);
+}
+
+// Upload a base64-encoded file directly to S3
+export async function uploadBase64File(
+  base64Data: string, 
+  contentType: string, 
+  userId: string, 
+  folderId?: string
+): Promise<{ key: string; size: number }> {
+  const id = nanoid();
+  const folderPath = folderId ? `users/${userId}/folders/${folderId}` : `users/${userId}`;
+  const key = `${folderPath}/${id}`;
+  
+  // Remove potential data URL prefix
+  const base64Content = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+  
+  // Convert base64 to Buffer
+  const buffer = Buffer.from(base64Content, 'base64');
+  
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  });
+  
+  await s3Client.send(command);
+  
+  return {
+    key,
+    size: buffer.length,
+  };
 }
