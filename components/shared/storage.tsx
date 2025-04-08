@@ -11,7 +11,13 @@ interface StorageProps {
 }
 
 const Storage = ({ totalSize }: StorageProps) => {
-  const { subscription, totalStorage, setTotalStorage, setIsLoading, setSubscription } = useSubscription();
+  const { 
+    subscription, 
+    totalStorage, 
+    setTotalStorage, 
+    setIsLoading, 
+    setSubscription 
+  } = useSubscription();
 
   useEffect(() => {
     const fetchStorageInfo = async () => {
@@ -33,7 +39,12 @@ const Storage = ({ totalSize }: StorageProps) => {
     };
 
     fetchStorageInfo();
-  }, [setTotalStorage, setIsLoading, totalSize]);
+  }, [
+    setTotalStorage, 
+    setIsLoading, 
+    totalSize, 
+    setSubscription
+  ]);
 
   // Calculate storage limit based on subscription
   const storageLimit = subscription === 'Basic' ? 1.5 * 1024 * 1024 * 1024 : 15 * 1024 * 1024 * 1024;

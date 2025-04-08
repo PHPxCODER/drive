@@ -33,50 +33,49 @@ export async function POST(req: NextRequest) {
     
     // If base64Data is provided, upload directly
     if (base64Data) {
-      const { key, size } = await uploadBase64File(base64Data, contentType, userId, folderId);
-      
-      // Check if uploading this file would exceed the user's storage limit
-      if (user.storageUsed + size > storageLimit) {
-        return NextResponse.json({ error: 'Storage limit exceeded' }, { status: 403 });
+      try {
+        const { key, size } = await uploadBase64File(base64Data, contentType, userId, folderId);
+        
+        // Check if uploading this file would exceed the user's storage limit
+        if (user.storageUsed + size > storageLimit) {
+          return NextResponse.json({ error: 'Storage limit exceeded' }, { status: 403 });
+        }
+        
+        // Create file record in database only after successful upload
+        const file = await prisma.file.create({
+          data: {
+            name,
+            type: contentType,
+            size,
+            key,
+            userId,
+            folderId: folderId || null,
+          },
+        });
+        
+        // Update user's storage usage
+        await prisma.user.update({
+          where: { id: userId },
+          data: { storageUsed: { increment: size } },
+        });
+        
+        return NextResponse.json({ fileId: file.id, key });
+      } catch (uploadError) {
+        console.error('File upload error:', uploadError);
+        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
       }
-      
-      // Create file record in database
-      const file = await prisma.file.create({
-        data: {
-          name,
-          type: contentType,
-          size,
-          key,
-          userId,
-          folderId: folderId || null,
-        },
-      });
-      
-      // Update user's storage usage
-      await prisma.user.update({
-        where: { id: userId },
-        data: { storageUsed: { increment: size } },
-      });
-      
-      return NextResponse.json({ fileId: file.id, key });
     }
     
     // Otherwise, generate a presigned URL for client-side upload
-    const { url, key } = await generateUploadUrl(contentType, userId, folderId);
-    
-    // Create a placeholder file record (size will be updated after upload completes)
-    const file = await prisma.file.create({
-      data: {
-        name,
-        type: contentType,
-        size: 0, // Placeholder size
-        key,
-        userId,
-        folderId: folderId || null,
-      },
-    });
-    
-    return NextResponse.json({ url, fileId: file.id, key });
+    try {
+      const { url, key } = await generateUploadUrl(contentType, userId, folderId);
+      
+      // No database record created until upload is confirmed complete
+      return NextResponse.json({ url, key });
+    } catch (urlError) {
+      console.error('Upload URL generation error:', urlError);
+      return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 });
+    }
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(

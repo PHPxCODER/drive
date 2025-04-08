@@ -67,12 +67,24 @@ const ListItem = ({ item }: ListItemProps) => {
     }
   };
 
-  // Format the timestamp (timestamp is now a string ISO date from Prisma, not a Firebase timestamp)
-  const formattedDate = item.timestamp ? 
-    (typeof item.timestamp === 'string' ? 
-      format(new Date(item.timestamp), 'MMM dd, yyyy') : 
-      format(new Date(item.timestamp.seconds * 1000), 'MMM dd, yyyy'))
-    : 'Unknown date';
+  // Safely format the date
+  const formattedDate = (() => {
+    const dateToFormat = item.createdAt || item.timestamp;
+    
+    if (!dateToFormat) return 'Unknown date';
+    
+    // Handle different date input types
+    const dateObj = dateToFormat instanceof Date 
+      ? dateToFormat 
+      : typeof dateToFormat === 'string' 
+        ? new Date(dateToFormat) 
+        : new Date(dateToFormat.seconds * 1000);
+    
+    // Check if date is valid
+    return isNaN(dateObj.getTime()) 
+      ? 'Unknown date' 
+      : format(dateObj, 'MMM dd, yyyy');
+  })();
 
   return (
     <TableRow
@@ -139,7 +151,7 @@ const ListItem = ({ item }: ListItemProps) => {
         <ListAction item={item} onStartEditing={onStartEditing} />
       </TableCell>
     </TableRow>
-  );
-};
+  )
+}
 
-export default ListItem;
+export default ListItem

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '../ui/button'
 import { Clock5, Cloud, Loader, Plus, Star, Tablet, Trash } from 'lucide-react'
 import Link from 'next/link'
@@ -11,15 +11,62 @@ import PopoverActions from './popover-actions'
 import { usePlan } from '@/hooks/use-plan'
 import { useSubscription } from '@/hooks/use-subscribtion'
 import { byteConverter } from '@/lib/utils'
+import axios from 'axios'
 
 const Sidebar = () => {
 	const { onOpen } = usePlan()
-	const { subscription, isLoading, totalStorage } = useSubscription()
+	const { 
+		subscription, 
+		isLoading, 
+		totalStorage, 
+		setTotalStorage, 
+		setIsLoading, 
+		setSubscription 
+	} = useSubscription()
+	const [deviceType, setDeviceType] = useState<'mobile' | 'desktop'>('desktop')
 
-	const totalValue = subscription === 'Basic' ? 15_000_000 : 15_000_000_0
+	// Fetch storage info
+	useEffect(() => {
+		const fetchStorageInfo = async () => {
+			try {
+				setIsLoading(true)
+				const response = await axios.get('/api/storage')
+				
+				setTotalStorage(response.data.storageUsed)
+				if (response.data.subscription) {
+					setSubscription(response.data.subscription)
+				}
+			} catch (error) {
+				console.error('Failed to fetch storage info:', error)
+			} finally {
+				setIsLoading(false)
+			}
+		}
+
+		fetchStorageInfo()
+
+		// Check device type
+		const checkDeviceType = () => {
+			setDeviceType(window.innerWidth < 768 ? 'mobile' : 'desktop')
+		}
+
+		checkDeviceType()
+		window.addEventListener('resize', checkDeviceType)
+
+		return () => {
+			window.removeEventListener('resize', checkDeviceType)
+		}
+	}, [setTotalStorage, setIsLoading, setSubscription])
+
+	const totalValue = subscription === 'Basic' ? 1.5 * 1024 * 1024 * 1024 : 15 * 1024 * 1024 * 1024
+	const storagePercentage = (totalStorage / totalValue) * 100
+
+	if (deviceType === 'mobile') {
+		return null // We'll handle mobile sidebar differently
+	}
 
 	return (
-		<div className='h-[90vh] w-60 fixed top-[10vh] left-0 z-30 bg-[#F6F9FC] dark:bg-[#1f1f1f]'>
+		<div className='h-[90vh] w-60 fixed top-[10vh] left-0 z-30 bg-[#F6F9FC] dark:bg-[#1f1f1f] overflow-y-auto'>
 			<div className='flex flex-col p-3'>
 				<Popover>
 					<PopoverTrigger asChild>
@@ -41,9 +88,14 @@ const Sidebar = () => {
 					))}
 
 					<div className='flex flex-col space-y-2 mx-4'>
-						{isLoading ? null : (
+						{isLoading ? (
+							<Loader className='mx-auto animate-spin' />
+						) : (
 							<>
-								<Progress className='h-2' value={totalStorage / totalValue} />
+								<Progress 
+									className='h-2' 
+									value={storagePercentage} 
+								/>
 								<span>
 									{byteConverter(totalStorage, 1)} of{' '}
 									{subscription === 'Basic' ? '1.5 GB' : '15 GB'} used

@@ -1,5 +1,3 @@
-// lib/s3.ts
-
 import { S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -10,18 +8,15 @@ const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklm
 
 // Create an S3 client
 const s3Client = new S3Client({
-  region: process.env.MINIO_REGION || 'ap-southeast-1', // Doesn't matter for MinIO
-  endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+  region: process.env.AWS_S3_REGION || 'us-east-1',
   credentials: {
-    accessKeyId: process.env.MINIO_ACCESS_KEY || 'minioadmin',
-    secretAccessKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
+    accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY!,
   },
-  forcePathStyle: true, // Required for MinIO
-  // tls: process.env.MINIO_USE_SSL === 'true',
 });
 
 // Bucket name
-const BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'user-files';
+const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
 
 // Generate an upload URL for a new file
 export async function generateUploadUrl(
@@ -72,10 +67,25 @@ export async function deleteFile(key: string): Promise<void> {
 
 // Calculate the file size in bytes from a base64 string
 export function calculateFileSize(base64String: string): number {
-  // Remove the data URL prefix (if present)
-  const base64Data = base64String.split(',')[1] || base64String;
-  // Calculate size: Base64 encodes 3 bytes into 4 characters
-  return Math.ceil((base64Data.length * 3) / 4);
+  try {
+    // Remove the data URL prefix (if present)
+    const base64Data = base64String.includes(',') 
+      ? base64String.split(',')[1] 
+      : base64String;
+    
+    // Remove any whitespace
+    const cleanBase64 = base64Data.replace(/\s/g, '');
+    
+    // Calculate size: Base64 encodes 3 bytes into 4 characters
+    // Also account for potential padding
+    const paddingCount = cleanBase64.endsWith('==') ? 2 : 
+                         cleanBase64.endsWith('=') ? 1 : 0;
+    
+    return Math.floor((cleanBase64.length * 3) / 4 - paddingCount);
+  } catch (error) {
+    console.error('File size calculation error:', error);
+    throw new Error('Failed to calculate file size');
+  }
 }
 
 // Upload a base64-encoded file directly to S3
@@ -89,23 +99,30 @@ export async function uploadBase64File(
   const folderPath = folderId ? `users/${userId}/folders/${folderId}` : `users/${userId}`;
   const key = `${folderPath}/${id}`;
   
-  // Remove potential data URL prefix
-  const base64Content = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
-  
-  // Convert base64 to Buffer
-  const buffer = Buffer.from(base64Content, 'base64');
-  
-  const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: key,
-    Body: buffer,
-    ContentType: contentType,
-  });
-  
-  await s3Client.send(command);
-  
-  return {
-    key,
-    size: buffer.length,
-  };
+  try {
+    // Remove potential data URL prefix
+    const base64Content = base64Data.includes(',') 
+      ? base64Data.split(',')[1] 
+      : base64Data;
+    
+    // Convert base64 to Buffer
+    const buffer = Buffer.from(base64Content, 'base64');
+    
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+    
+    await s3Client.send(command);
+    
+    return {
+      key,
+      size: buffer.length,
+    };
+  } catch (error) {
+    console.error('Base64 file upload error:', error);
+    throw new Error('Failed to upload base64 file');
+  }
 }

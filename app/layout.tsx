@@ -6,6 +6,7 @@ import SessionWrapper from "@/components/SessionWrapper";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import ModalProvider from "@/components/providers/modal-provider";
 import { Toaster } from "sonner";
+import { UploadProvider } from "@/components/UploadProgress";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,7 +28,8 @@ export default function RootLayout({
           >
             <Toaster position="top-center" />
             <ModalProvider />
-            {children}
+            <UploadProvider>
+            {children}</UploadProvider>
           </ThemeProvider>
         </body>
       </html>
