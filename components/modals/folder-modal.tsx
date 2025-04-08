@@ -1,62 +1,57 @@
-"use client";
+'use client';
 
-import React from "react";
+import React from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "../ui/dialog";
-import { useFolder } from "@/hooks/use-folder";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { formSchema } from "@/lib/validation";
+} from '@/components/ui/dialog';
+import { useFolder } from '@/hooks/use-folder';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { formSchema } from '@/lib/validation';
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
-} from "../ui/form";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useSession } from "next-auth/react";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+} from '@/components/ui/form';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useSession } from 'next-auth/react';
+import { toast } from 'sonner';
+import { useRouter, useParams } from 'next/navigation';
+import axios from 'axios';
 
 const FolderModal = () => {
   const { isOpen, onClose } = useFolder();
   const { data: session } = useSession();
   const router = useRouter();
+  const { documentId } = useParams();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: "" },
+    defaultValues: { name: '' },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const promise = addDoc(collection(db, "folders"), {
-      name: values.name,
-      timestamp: serverTimestamp(),
-      uid: session?.user?.id,
-      isArchive: false,
-      isDocument: false,
-    }).then(() => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      await axios.post('/api/folders', {
+        name: values.name,
+        parentId: documentId || null
+      });
+      
       form.reset();
       onClose();
+      toast.success('Folder created successfully');
       router.refresh();
-    });
-
-    toast.promise(promise, {
-      loading: "Loading...",
-      success: "Folder created",
-      error: "Error creating folder",
-    });
+    } catch (error) {
+      console.error('Create folder error:', error);
+      toast.error('Failed to create folder');
+    }
   };
 
   return (

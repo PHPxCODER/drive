@@ -1,26 +1,9 @@
 import Header from '@/components/shared/header'
 import Lists from '@/components/shared/lists'
-import { db } from '@/lib/firebase'
 import { getServerSession } from 'next-auth/next'
-import { collection, getDocs, query, where } from 'firebase/firestore'
 import React from 'react'
 import { authOptions } from '@/auth.config'
-
-const getData = async (uid: string, type: 'files' | 'folders') => {
-	let data: any[] = []
-	const q = query(
-		collection(db, type),
-		where('uid', '==', uid),
-		where('isArchive', '==', false),
-		where('isDocument', '==', false)
-	)
-	const querySnapshot = await getDocs(q)
-	querySnapshot.forEach(doc => {
-		data.push({ ...doc.data(), id: doc.id })
-	})
-
-	return data
-}
+import { prisma } from '@/lib/prisma'
 
 const HomePage = async () => {
 	const session = await getServerSession(authOptions)
@@ -31,8 +14,29 @@ const HomePage = async () => {
 		return <div>Please sign in to access your drive</div>
 	}
 	
-	const folders = await getData(userId, 'folders')
-	const files = await getData(userId, 'files')
+	// Get folders from database
+	const folders = await prisma.folder.findMany({
+		where: {
+			userId,
+			isArchive: false,
+			isDocument: false
+		},
+		orderBy: {
+			createdAt: 'desc'
+		}
+	})
+	
+	// Get files from database
+	const files = await prisma.file.findMany({
+		where: {
+			userId,
+			isArchive: false,
+			isDocument: false
+		},
+		orderBy: {
+			createdAt: 'desc'
+		}
+	})
 
 	return (
 		<>

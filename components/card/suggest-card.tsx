@@ -1,19 +1,18 @@
-"use client";
+'use client';
 
-import { defineImageAndFile } from "@/lib/utils";
-import { IFolderAndFile } from "@/types";
-import { File, Paperclip, Save, X } from "lucide-react";
-import Image from "next/image";
-import React, { ElementRef, useRef, useState } from "react";
-import { Avatar, AvatarImage } from "../ui/avatar";
-import { useSession } from "next-auth/react";
-import ListAction from "../shared/list-action";
-import { useParams, useRouter } from "next/navigation";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { toast } from "sonner";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
+import { defineImageAndFile } from '@/lib/utils';
+import { IFolderAndFile } from '@/types';
+import { File, Paperclip, Save, X } from 'lucide-react';
+import Image from 'next/image';
+import React, { ElementRef, useRef, useState, useEffect } from 'react';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { useSession } from 'next-auth/react';
+import ListAction from '@/components/shared/list-action';
+import { useParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import axios from 'axios';
 
 interface SuggestCardProps {
   item: IFolderAndFile;
@@ -22,11 +21,28 @@ interface SuggestCardProps {
 const SuggestCard = ({ item }: SuggestCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(item.name);
-
-  const inputRef = useRef<ElementRef<"input">>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const inputRef = useRef<ElementRef<'input'>>(null);
   const { refresh } = useRouter();
   const { data: session } = useSession();
   const { documentId } = useParams();
+  const itemType = item.size ? 'files' : 'folders';
+
+  useEffect(() => {
+    // If this is a file, fetch the download URL
+    if (item.size && item.key) {
+      const fetchImageUrl = async () => {
+        try {
+          const response = await axios.get(`/api/files/${item.id}/download`);
+          setImageUrl(response.data.url);
+        } catch (error) {
+          console.error('Error fetching file URL:', error);
+        }
+      };
+      
+      fetchImageUrl();
+    }
+  }, [item.id, item.size, item.key]);
 
   const onStartEditing = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.stopPropagation();
@@ -37,33 +53,33 @@ const SuggestCard = ({ item }: SuggestCardProps) => {
     }, 0);
   };
 
-  const onSave = () => {
-    const type = item.size ? "files" : "folders";
-    const folderId = documentId as string;
-    const ref = documentId
-      ? doc(db, "folders", folderId, "files", item.id)
-      : doc(db, type, item.id);
-
-    const promise = setDoc(ref, {
-      ...item,
-      name: value.length ? value : "Untitled",
-    }).then(() => {
+  const onSave = async () => {
+    if (!value.trim()) {
+      setValue(item.name);
       setIsEditing(false);
-      refresh();
-    });
+      return;
+    }
 
-    toast.promise(promise, {
-      loading: "Loading...",
-      success: "Saved!",
-      error: "Failed to save.",
-    });
+    try {
+      await axios.patch(`/api/${itemType}/${item.id}`, {
+        name: value,
+      });
+      
+      setIsEditing(false);
+      toast.success('Name updated successfully');
+      refresh();
+    } catch (error) {
+      console.error('Rename error:', error);
+      toast.error('Failed to update name');
+    }
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       onSave();
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       setIsEditing(false);
+      setValue(item.name);
     }
   };
 
@@ -80,8 +96,8 @@ const SuggestCard = ({ item }: SuggestCardProps) => {
 
           <div className="absolute right-0 top-0 h-full flex items-center space-x-1">
             <Button
-              size={"sm"}
-              variant={"outline"}
+              size={'sm'}
+              variant={'outline'}
               className="h-full"
               onClick={onSave}
             >
@@ -89,10 +105,13 @@ const SuggestCard = ({ item }: SuggestCardProps) => {
             </Button>
 
             <Button
-              size={"sm"}
-              variant={"outline"}
+              size={'sm'}
+              variant={'outline'}
               className="h-full"
-              onClick={() => setIsEditing(false)}
+              onClick={() => {
+                setIsEditing(false);
+                setValue(item.name);
+              }}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -109,12 +128,12 @@ const SuggestCard = ({ item }: SuggestCardProps) => {
         </div>
       )}
       <div className="relative h-[70%] w-full bg-white dark:bg-black mt-2 rounded-md">
-        {defineImageAndFile(item.type) === "file" ? (
+        {defineImageAndFile(item.type) === 'file' ? (
           <div className="flex h-full items-center justify-center">
             <File className="w-16 h-16" strokeWidth={1} />
           </div>
         ) : (
-          <Image fill src={item.image || "/fallback-image.png"} alt="image" className="object-cover" />
+          imageUrl && <Image fill src={imageUrl} alt={item.name} className="object-cover" />
         )}
       </div>
 

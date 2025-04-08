@@ -8,26 +8,10 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table'
-import { db } from '@/lib/firebase'
 import { getServerSession } from 'next-auth/next'
-import { collection, getDocs, query, where } from 'firebase/firestore'
 import React from 'react'
 import { authOptions } from '@/auth.config'
-
-const getData = async (uid: string) => {
-	let data: any[] = []
-	const q = query(
-		collection(db, 'files'),
-		where('uid', '==', uid),
-		where('isArchive', '==', false)
-	)
-	const querySnapshot = await getDocs(q)
-	querySnapshot.forEach(doc => {
-		data.push({ ...doc.data(), id: doc.id })
-	})
-
-	return data
-}
+import { prisma } from '@/lib/prisma'
 
 const CloudPage = async () => {
 	const session = await getServerSession(authOptions)
@@ -38,14 +22,24 @@ const CloudPage = async () => {
 		return <div>Please sign in to access your storage</div>
 	}
 	
-	const files = await getData(userId)
+	// Get files from database
+	const files = await prisma.file.findMany({
+		where: {
+			userId,
+			isArchive: false
+		},
+		orderBy: {
+			createdAt: 'desc'
+		}
+	})
 
-	const totalSize = files.reduce((acc, file) => acc + file.size, 0)
+	// Calculate total size
+	const totalSize = files.reduce((acc, file) => acc + (file.size || 0), 0)
 
 	return (
 		<>
 			<Header label='Storage' />
-			<Storage totalSize={JSON.parse(JSON.stringify(totalSize))} />
+			<Storage totalSize={totalSize} />
 
 			<Table className='mt-4'>
 				<TableHeader>
@@ -58,10 +52,10 @@ const CloudPage = async () => {
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{files.map(folder => (
+					{files.map(file => (
 						<ListItem
-							key={folder.id}
-							item={JSON.parse(JSON.stringify(folder))}
+							key={file.id}
+							item={JSON.parse(JSON.stringify(file))}
 						/>
 					))}
 				</TableBody>

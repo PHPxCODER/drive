@@ -9,27 +9,10 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table'
-import { db } from '@/lib/firebase'
 import { getServerSession } from 'next-auth/next'
-import { collection, getDocs, query, where } from 'firebase/firestore'
 import React from 'react'
 import { authOptions } from '@/auth.config'
-
-const getData = async (uid: string, type: 'files' | 'folders') => {
-	let data: any[] = []
-	const q = query(
-		collection(db, type),
-		where('uid', '==', uid),
-		where('isArchive', '==', false),
-		where('isStar', '==', true)
-	)
-	const querySnapshot = await getDocs(q)
-	querySnapshot.forEach(doc => {
-		data.push({ ...doc.data(), id: doc.id })
-	})
-
-	return data
-}
+import { prisma } from '@/lib/prisma'
 
 const StarredPage = async () => {
 	const session = await getServerSession(authOptions)
@@ -40,8 +23,29 @@ const StarredPage = async () => {
 		return <div>Please sign in to access your starred items</div>
 	}
 	
-	const folders = await getData(userId, 'folders')
-	const files = await getData(userId, 'files')
+	// Get starred folders
+	const folders = await prisma.folder.findMany({
+		where: {
+			userId,
+			isArchive: false,
+			isStar: true
+		},
+		orderBy: {
+			createdAt: 'desc'
+		}
+	})
+	
+	// Get starred files
+	const files = await prisma.file.findMany({
+		where: {
+			userId,
+			isArchive: false,
+			isStar: true
+		},
+		orderBy: {
+			createdAt: 'desc'
+		}
+	})
 
 	return (
 		<>
@@ -53,7 +57,10 @@ const StarredPage = async () => {
 					<div className='text-sm opacity-70 mt-6'>Suggested</div>
 					<div className='grid grid-cols-4 gap-4 mt-4'>
 						{files.map(file => (
-							<SuggestCard item={file} key={file.id} />
+							<SuggestCard 
+								item={JSON.parse(JSON.stringify(file))} 
+								key={file.id} 
+							/>
 						))}
 					</div>
 					<div className='text-sm opacity-70 mt-6'>Folders</div>

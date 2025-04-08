@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth/next';
 import { prisma } from '@/lib/prisma';
 import { OPTIONS } from '@/auth.config';
 
+export const dynamic = 'force-dynamic';
+
 // Get user's files (with optional filters)
 export async function GET(req: NextRequest) {
   try {

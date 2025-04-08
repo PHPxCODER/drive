@@ -8,27 +8,11 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table'
-import { db } from '@/lib/firebase'
 import { DocIdProps } from '@/types'
 import { getServerSession } from 'next-auth/next'
-import { collection, getDocs, query, where } from 'firebase/firestore'
 import React from 'react'
 import { authOptions } from '@/auth.config'
-
-const getFiles = async (folderId: string, uid: string) => {
-	let files: any[] = []
-	const q = query(
-		collection(db, 'folders', folderId, 'files'),
-		where('uid', '==', uid),
-		where('isArchive', '==', true)
-	)
-	const querySnapshot = await getDocs(q)
-	querySnapshot.forEach(doc => {
-		files.push({ ...doc.data(), id: doc.id })
-	})
-
-	return files
-}
+import { prisma } from '@/lib/prisma'
 
 const DocumentTrashPage = async ({ params }: DocIdProps) => {
 	const session = await getServerSession(authOptions)
@@ -39,7 +23,17 @@ const DocumentTrashPage = async ({ params }: DocIdProps) => {
 		return <div>Please sign in to access the trash</div>
 	}
 	
-	const files = await getFiles(params.documentId, userId)
+	// Get archived files in the folder
+	const files = await prisma.file.findMany({
+		where: {
+			folderId: params.documentId,
+			userId,
+			isArchive: true
+		},
+		orderBy: {
+			archivedAt: 'desc'
+		}
+	})
 
 	return (
 		<>
@@ -53,6 +47,7 @@ const DocumentTrashPage = async ({ params }: DocIdProps) => {
 							<TableHead>Name</TableHead>
 							<TableHead>Archived time</TableHead>
 							<TableHead>File size</TableHead>
+							<TableHead className="text-right">Actions</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>

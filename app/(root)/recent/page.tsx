@@ -8,27 +8,10 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table'
-import { db } from '@/lib/firebase'
 import { getServerSession } from 'next-auth/next'
-import { collection, getDocs, limit, query, where } from 'firebase/firestore'
 import React from 'react'
 import { authOptions } from '@/auth.config'
-
-const getData = async (uid: string, type: 'files' | 'folders') => {
-	let data: any[] = []
-	const q = query(
-		collection(db, type),
-		where('uid', '==', uid),
-		where('isArchive', '==', false),
-		limit(4)
-	)
-	const querySnapshot = await getDocs(q)
-	querySnapshot.forEach(doc => {
-		data.push({ ...doc.data(), id: doc.id })
-	})
-
-	return data
-}
+import { prisma } from '@/lib/prisma'
 
 const RecentPage = async () => {
 	const session = await getServerSession(authOptions)
@@ -39,8 +22,29 @@ const RecentPage = async () => {
 		return <div>Please sign in to access your recent items</div>
 	}
 	
-	const folders = await getData(userId, 'folders')
-	const files = await getData(userId, 'files')
+	// Get recent folders
+	const folders = await prisma.folder.findMany({
+		where: {
+			userId,
+			isArchive: false
+		},
+		orderBy: {
+			createdAt: 'desc'
+		},
+		take: 4
+	})
+	
+	// Get recent files
+	const files = await prisma.file.findMany({
+		where: {
+			userId,
+			isArchive: false
+		},
+		orderBy: {
+			createdAt: 'desc'
+		},
+		take: 4
+	})
 
 	return (
 		<>
@@ -59,10 +63,10 @@ const RecentPage = async () => {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{[...folders, ...files].map(folder => (
+						{[...folders, ...files].map(item => (
 							<ListItem
-								key={folder.id}
-								item={JSON.parse(JSON.stringify(folder))}
+								key={item.id}
+								item={JSON.parse(JSON.stringify(item))}
 							/>
 						))}
 					</TableBody>

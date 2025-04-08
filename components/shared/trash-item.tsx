@@ -1,18 +1,16 @@
-"use client";
+'use client';
 
-import { IFolderAndFile } from "@/types";
-import React from "react";
-import { TableCell, TableRow } from "../ui/table";
-import { File, Folder, Minus, MoreVertical, Trash, Undo } from "lucide-react";
-import { format } from "date-fns";
-import { byteConverter } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { deleteDoc, doc, setDoc } from "firebase/firestore";
-import { db, storage } from "@/lib/firebase";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import ConfirmModal from "../modals/confirm-modal";
-import { deleteObject, ref } from "firebase/storage";
+import { IFolderAndFile } from '@/types';
+import React from 'react';
+import { TableCell, TableRow } from '@/components/ui/table';
+import { File, Folder, Minus, MoreVertical, Trash, Undo } from 'lucide-react';
+import { format } from 'date-fns';
+import { byteConverter } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import ConfirmModal from '@/components/modals/confirm-modal';
+import axios from 'axios';
 
 interface TrashItemProps {
   item: IFolderAndFile;
@@ -20,48 +18,34 @@ interface TrashItemProps {
 
 const TrashItem = ({ item }: TrashItemProps) => {
   const { refresh } = useRouter();
+  const itemType = item.size ? 'files' : 'folders';
 
-  const type = item.size ? "files" : "folders";
+  // Format the timestamp for archived date
+  const formattedDate = item.archivedTime ? 
+    (typeof item.archivedTime === 'string' ? 
+      format(new Date(item.archivedTime), 'MMM dd, hh:mm a') : 
+      format(new Date(item.archivedTime.seconds * 1000), 'MMM dd, hh:mm a'))
+    : 'Unknown date';
 
-  const onRestore = () => {
-    const ref = doc(db, type, item.id);
-
-    const promise = setDoc(ref, {
-      ...item,
-      isArchive: false,
-      archivedTime: null,
-    }).then(() => refresh());
-
-    toast.promise(promise, {
-      loading: "Loading...",
-      success: "Restored!",
-      error: "Failed to restore.",
-    });
+  const onRestore = async () => {
+    try {
+      await axios.post(`/api/${itemType}/${item.id}/restore`);
+      toast.success('Item restored successfully');
+      refresh();
+    } catch (error) {
+      console.error('Restore error:', error);
+      toast.error('Failed to restore item');
+    }
   };
 
-  const onDelete = () => {
-    const refs = doc(db, type, item.id);
-
-    if (type === "folders") {
-      const promise = deleteDoc(refs).then(() => refresh());
-
-      toast.promise(promise, {
-        loading: "Loading...",
-        success: "Deleted!",
-        error: "Failed to delete.",
-      });
-    }
-
-    if (type === "files") {
-      const promise = deleteObject(ref(storage, item.image)).then(() => {
-        deleteDoc(refs).then(() => refresh());
-      });
-
-      toast.promise(promise, {
-        loading: "Loading...",
-        success: "Deleted!",
-        error: "Failed to delete.",
-      });
+  const onPermanentDelete = async () => {
+    try {
+      await axios.delete(`/api/${itemType}/${item.id}?permanent=true`);
+      toast.success('Item permanently deleted');
+      refresh();
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete item');
     }
   };
 
@@ -77,9 +61,7 @@ const TrashItem = ({ item }: TrashItemProps) => {
           <span>{item.name}</span>
         </div>
       </TableCell>
-      <TableCell>
-        {format(new Date(item.archivedTime.seconds * 1000), "MMM dd, hh:mm a")}
-      </TableCell>
+      <TableCell>{formattedDate}</TableCell>
       <TableCell>{item.size ? byteConverter(item.size) : <Minus />}</TableCell>
       <TableCell className="flex justify-end group items-center space-x-2">
         <Popover>
@@ -101,13 +83,13 @@ const TrashItem = ({ item }: TrashItemProps) => {
               <Undo className="w-4 h-4" />
               <span>Restore</span>
             </div>
-            <ConfirmModal onConfirm={onDelete}>
+            <ConfirmModal onConfirm={onPermanentDelete}>
               <div
                 className="w-full flex items-center hover:bg-secondary transition py-2 px-4 space-x-2 text-sm"
                 role="button"
               >
                 <Trash className="w-4 h-4" />
-                <span>Delete</span>
+                <span>Delete permanently</span>
               </div>
             </ConfirmModal>
           </PopoverContent>
